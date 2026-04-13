@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Last.fm Plugin Configuration</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #101010; color: #fff; padding: 20px; }
+        .container { max-width: 700px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+        h1 img { width: 32px; height: 32px; border-radius: 6px; }
+        .subtitle { color: #aaa; margin-bottom: 24px; font-size: 0.9rem; }
+        .status { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem; }
+        .status.connected { background: #1a3a1a; border: 1px solid #2d5a2d; color: #6ee66e; }
+        .status.disconnected { background: #3a1a1a; border: 1px solid #5a2d2d; color: #e66e6e; }
+        .card { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+        .card h2 { font-size: 1rem; margin-bottom: 16px; color: #ccc; }
+        .field { margin-bottom: 14px; }
+        .field label { display: block; font-size: 0.85rem; color: #999; margin-bottom: 4px; }
+        .field input[type="text"], .field input[type="password"], .field input[type="number"] { width: 100%; padding: 8px 12px; background: #0d0d0d; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 0.9rem; }
+        .field input:focus { outline: none; border-color: #5b9bd5; }
+        .field .help { font-size: 0.75rem; color: #666; margin-top: 3px; }
+        .toggle { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+        .toggle span { font-size: 0.9rem; }
+        .toggle input[type="checkbox"] { width: 40px; height: 20px; appearance: none; background: #444; border-radius: 10px; position: relative; cursor: pointer; flex-shrink: 0; }
+        .toggle input[type="checkbox"]::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: 0.2s; }
+        .toggle input[type="checkbox"]:checked { background: #5b9bd5; }
+        .toggle input[type="checkbox"]:checked::after { left: 22px; }
+        .range-row { display: flex; align-items: center; gap: 12px; }
+        .range-row input[type="range"] { flex: 1; accent-color: #5b9bd5; }
+        .range-row .value { font-size: 0.9rem; color: #5b9bd5; min-width: 40px; text-align: center; }
+        .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 0.9rem; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-primary { background: #5b9bd5; color: #fff; }
+        .btn-primary:hover { background: #4a8ac4; }
+        .btn-secondary { background: #333; color: #fff; }
+        .btn-secondary:hover { background: #444; }
+        .btn-danger { background: #c44; color: #fff; }
+        .btn-danger:hover { background: #b33; }
+        .message { padding: 10px 16px; border-radius: 8px; margin-top: 12px; font-size: 0.85rem; display: none; }
+        .message.success { background: #1a3a1a; border: 1px solid #2d5a2d; color: #6ee66e; display: block; }
+        .message.error { background: #3a1a1a; border: 1px solid #5a2d2d; color: #e66e6e; display: block; }
+        .link { color: #5b9bd5; text-decoration: none; }
+        .link:hover { text-decoration: underline; }
+        .divider { border: none; border-top: 1px solid #333; margin: 16px 0; }
+        .field-row { display: flex; gap: 10px; }
+        .field-row .field { flex: 1; }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><img src="https://raw.githubusercontent.com/pepebarrascout/jellyfin-plugin-lastfm/main/logo.png" alt=""> Last.fm</h1>
+        <p class="subtitle">Scrobble your music to Last.fm</p>
+
+        <div id="status" class="status disconnected">Not connected to Last.fm</div>
+
+        <div class="card">
+            <h2>Last.fm API Credentials</h2>
+            <p style="color:#888;font-size:0.85rem;margin-bottom:14px;">
+                Get your API key at <a class="link" href="https://www.last.fm/api/account/create" target="_blank">last.fm/api/account/create</a>
+            </p>
+            <div class="field">
+                <label>API Key</label>
+                <input type="text" id="apiKey" placeholder="Your Last.fm API key">
+            </div>
+            <div class="field">
+                <label>Shared Secret</label>
+                <input type="password" id="apiSecret" placeholder="Your Last.fm API shared secret">
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Authentication</h2>
+            <div id="authSection">
+                <p style="color:#888;font-size:0.85rem;margin-bottom:14px;">
+                    1. Save your API credentials above first.<br>
+                    2. Click <strong>"Connect to Last.fm"</strong> and authorize the application.<br>
+                    3. After authorizing, paste the token from the callback URL.
+                </p>
+                <div class="btn-row" style="margin-top:12px;">
+                    <button class="btn btn-secondary" id="btnConnect" onclick="connectLastfm()">Connect to Last.fm</button>
+                </div>
+                <div id="tokenSection" style="display:none;margin-top:14px;">
+                    <div class="field">
+                        <label>Auth Token (from callback URL)</label>
+                        <div class="field-row">
+                            <input type="text" id="authToken" placeholder="Paste the token here">
+                            <button class="btn btn-primary" onclick="authenticateWithToken()" style="white-space:nowrap;">Verify Token</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="connectedInfo" style="display:none">
+                <p style="color:#6ee66e;font-size:0.9rem;">
+                    Connected as <strong id="username"></strong>
+                </p>
+                <hr class="divider">
+                <button class="btn btn-danger" onclick="disconnectLastfm()">Disconnect</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Settings</h2>
+            <div class="toggle">
+                <span>Enable Scrobbling</span>
+                <input type="checkbox" id="scrobblingEnabled" checked>
+            </div>
+            <div class="toggle">
+                <span>Enable Now Playing Notifications</span>
+                <input type="checkbox" id="nowPlayingEnabled" checked>
+            </div>
+            <div class="field">
+                <label>Scrobble after</label>
+                <div class="range-row">
+                    <input type="range" id="scrobblePercent" min="25" max="95" value="50" oninput="document.getElementById('scrobbleValue').textContent=this.value+'%'">
+                    <span class="value" id="scrobbleValue">50%</span>
+                </div>
+                <div class="help">Percentage of track playback before scrobbling (Last.fm maximum: 4 minutes)</div>
+            </div>
+            <div class="field">
+                <label>Minimum track duration (seconds)</label>
+                <input type="number" id="minDuration" value="30" min="0" max="600">
+                <div class="help">Tracks shorter than this will not be scrobbled (Last.fm minimum: 30s)</div>
+            </div>
+            <div class="toggle">
+                <span>Auto-love liked tracks</span>
+                <input type="checkbox" id="autoLoveLikedTracks" checked>
+            </div>
+            <div class="toggle">
+                <span>Use Album Artist for scrobbling</span>
+                <input type="checkbox" id="useAlbumArtist">
+            </div>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="saveConfig()">Save Changes</button>
+        </div>
+        <div id="message" class="message"></div>
+    </div>
+
+    <script>
+        const pluginName = 'Jellyfin.Plugin.Lastfm';
+
+        async function loadConfig() {
+            try {
+                // Jellyfin plugin config API
+                const resp = await fetch(`/System/Configuration/${pluginName}`);
+                if (!resp.ok) {
+                    console.warn('Config endpoint not available, using defaults');
+                    return;
+                }
+                const config = await resp.json();
+
+                if (config.ApiKey) document.getElementById('apiKey').value = config.ApiKey;
+                if (config.ApiSecret) document.getElementById('apiSecret').value = config.ApiSecret;
+                document.getElementById('scrobblingEnabled').checked = config.ScrobblingEnabled !== false;
+                document.getElementById('nowPlayingEnabled').checked = config.NowPlayingEnabled !== false;
+                const percent = config.ScrobblePercent || 50;
+                document.getElementById('scrobblePercent').value = percent;
+                document.getElementById('scrobbleValue').textContent = percent + '%';
+                document.getElementById('minDuration').value = config.MinDurationSeconds || 30;
+                document.getElementById('autoLoveLikedTracks').checked = config.AutoLoveLikedTracks !== false;
+                document.getElementById('useAlbumArtist').checked = config.UseAlbumArtist || false;
+
+                if (config.SessionKey && config.Username) {
+                    showConnected(config.Username);
+                }
+            } catch (e) {
+                console.error('Failed to load config:', e);
+            }
+        }
+
+        function showConnected(username) {
+            document.getElementById('status').className = 'status connected';
+            document.getElementById('status').textContent = 'Connected as ' + username;
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('connectedInfo').style.display = 'block';
+            document.getElementById('username').textContent = username;
+        }
+
+        function showDisconnected() {
+            document.getElementById('status').className = 'status disconnected';
+            document.getElementById('status').textContent = 'Not connected to Last.fm';
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('connectedInfo').style.display = 'none';
+            document.getElementById('tokenSection').style.display = 'none';
+        }
+
+        function getConfig() {
+            return {
+                ApiKey: document.getElementById('apiKey').value.trim(),
+                ApiSecret: document.getElementById('apiSecret').value.trim(),
+                ScrobblingEnabled: document.getElementById('scrobblingEnabled').checked,
+                NowPlayingEnabled: document.getElementById('nowPlayingEnabled').checked,
+                ScrobblePercent: parseInt(document.getElementById('scrobblePercent').value),
+                MinDurationSeconds: parseInt(document.getElementById('minDuration').value) || 30,
+                AutoLoveLikedTracks: document.getElementById('autoLoveLikedTracks').checked,
+                UseAlbumArtist: document.getElementById('useAlbumArtist').checked
+            };
+        }
+
+        async function saveConfig() {
+            const config = getConfig();
+            try {
+                const resp = await fetch(`/System/Configuration/${pluginName}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                if (resp.ok) {
+                    showMessage('Configuration saved successfully!', 'success');
+                } else {
+                    const err = await resp.text();
+                    showMessage('Failed to save: ' + err, 'error');
+                }
+            } catch (e) {
+                showMessage('Error saving configuration: ' + e.message, 'error');
+            }
+        }
+
+        async function connectLastfm() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const apiSecret = document.getElementById('apiSecret').value.trim();
+            if (!apiKey || !apiSecret) {
+                showMessage('Please enter your API Key and Shared Secret first, then Save.', 'error');
+                return;
+            }
+            // Save credentials first
+            await saveConfig();
+
+            // Generate auth URL manually (API pattern)
+            const authUrl = 'https://www.last.fm/api/auth/?api_key=' + encodeURIComponent(apiKey);
+            window.open(authUrl, '_blank');
+            document.getElementById('tokenSection').style.display = 'block';
+            showMessage('A tab opened to authorize. After authorizing, paste the token from the callback URL.', 'success');
+        }
+
+        async function authenticateWithToken() {
+            const token = document.getElementById('authToken').value.trim();
+            if (!token) {
+                showMessage('Please enter the token from the callback URL', 'error');
+                return;
+            }
+
+            showMessage('<span class="spinner"></span> Authenticating...', '');
+
+            try {
+                // Use Jellyfin plugin service proxy
+                const apiKey = document.getElementById('apiKey').value.trim();
+                const apiSecret = document.getElementById('apiSecret').value.trim();
+
+                // Call the Last.fm auth.getSession API directly via fetch
+                // Step 1: Generate API signature
+                const params = new URLSearchParams({
+                    method: 'auth.getSession',
+                    api_key: apiKey,
+                    token: token,
+                    format: 'json'
+                });
+
+                // We need to call our plugin's authenticate endpoint
+                // Since we don't have a direct endpoint, we'll use a workaround:
+                // Store the token in config and the plugin will pick it up
+                const config = getConfig();
+                config._pendingAuthToken = token;
+                
+                const resp = await fetch(`/System/Configuration/${pluginName}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                if (resp.ok) {
+                    showMessage('Token saved. The plugin will authenticate on the next playback event. Please restart Jellyfin for the connection to take effect.', 'success');
+                    document.getElementById('tokenSection').style.display = 'none';
+                } else {
+                    showMessage('Failed to save token', 'error');
+                }
+            } catch (e) {
+                showMessage('Error: ' + e.message, 'error');
+            }
+        }
+
+        async function disconnectLastfm() {
+            const config = getConfig();
+            config.SessionKey = '';
+            config.Username = '';
+            config._pendingAuthToken = '';
+            try {
+                await fetch(`/System/Configuration/${pluginName}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                showDisconnected();
+                showMessage('Disconnected from Last.fm', 'success');
+            } catch (e) {
+                showMessage('Error: ' + e.message, 'error');
+            }
+        }
+
+        function showMessage(html, type) {
+            const el = document.getElementById('message');
+            el.innerHTML = html;
+            el.className = 'message' + (type ? ' ' + type : '');
+            if (type) setTimeout(() => { el.className = 'message'; el.innerHTML = ''; }, 5000);
+        }
+
+        loadConfig();
+    </script>
+</body>
+</html>

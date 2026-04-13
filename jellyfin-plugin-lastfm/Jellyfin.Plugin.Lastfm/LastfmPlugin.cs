@@ -21,12 +21,29 @@ namespace Jellyfin.Plugin.Lastfm;
 /// Registers the plugin with Jellyfin's DI container and hooks into
 /// playback events for automatic scrobbling and now playing notifications.
 /// </summary>
-public class LastfmPluginEntry : IPluginServiceRegistrator
+public class LastfmPluginEntry : IPluginServiceRegistrator, IHasWebPages
 {
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
         serviceCollection.AddSingleton<LastfmPlugin>();
+    }
+
+    /// <inheritdoc />
+    public IEnumerable<PluginPageInfo> GetPages()
+    {
+        return new[]
+        {
+            new PluginPageInfo
+            {
+                Name = "Lastfm",
+                DisplayName = "Last.fm",
+                EmbeddedResourcePath = "Jellyfin.Plugin.Lastfm.Configuration.config.html",
+                EnableInMainMenu = true,
+                MenuSection = "plugins",
+                MenuIcon = "music_note"
+            }
+        };
     }
 }
 
