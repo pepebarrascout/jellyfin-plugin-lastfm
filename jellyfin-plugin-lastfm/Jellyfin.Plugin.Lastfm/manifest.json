@@ -1,0 +1,14 @@
+{
+  "name": "Jellyfin Last.fm Plugin",
+  "version": "10.9.0",
+  "description": "Scrobble your music to Last.fm, update now playing status, and love/ban tracks directly from Jellyfin.",
+  "overview": "Integrates Jellyfin with Last.fm for automatic scrobbling, now playing notifications, and track management (love/ban).",
+  "owner": "jellyfin-community",
+  "category": "General",
+  "imageUrl": "https://raw.githubusercontent.com/jellyfin/jellyfin-plugin-lastfm/master/jellyfin-lastfm-logo.png",
+  "targetAbi": "10.10.0.0",
+  "timestamp": "2025-01-01T00:00:00Z",
+  "changelog": "- v10.9.0: Rewritten for Jellyfin 10.10.x with .NET 9 support\n- Support for now playing notifications\n- Support for love/ban tracks\n- Auto-love liked tracks option\n- Configurable scrobble percentage\n- Fixed authentication flow",
+  "manifestVersion": 2,
+  "assemblyGuid": "f3c07757-5b42-442e-a37a-f49355b6a7c0"
+}

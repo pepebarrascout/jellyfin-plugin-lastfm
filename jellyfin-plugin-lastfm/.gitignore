@@ -1,0 +1,17 @@
+## Build results
+bin/
+obj/
+artifacts/
+*.user
+*.suo
+*.cache
+*.dll
+*.pdb
+*.json
+!nuget.config
+!manifest.json
+!.editorconfig
+.vs/
+.vscode/
+*.DotSettings.user
+Thumbs.db
