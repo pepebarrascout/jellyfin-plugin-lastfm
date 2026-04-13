@@ -13,7 +13,7 @@
         "changelog": "- v10.9.0.0: Rewritten for Jellyfin 10.10+ with .NET 9 support\n- Automatic scrobbling with configurable threshold (50% or 4 min)\n- Now playing notifications to Last.fm\n- Love/Ban/Unlove track support via API\n- Auto-love liked tracks option\n- Multi-session playback tracking\n- Configurable: scrobble %, min duration, album artist",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/pepebarrascout/jellyfin-plugin-lastfm/releases/download/v10.9.0.0/jellyfin-plugin-lastfm_10.9.0.0.zip",
-        "checksum": "d05e7841bf3a9b666d302a653b7f6816",
+        "checksum": "13b21ddbfba492c92cd1566f174b864c",
         "timestamp": "2026-04-13T21:00:00Z"
       }
     ]
