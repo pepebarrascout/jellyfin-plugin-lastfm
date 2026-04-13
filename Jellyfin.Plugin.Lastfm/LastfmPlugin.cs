@@ -18,46 +18,16 @@ namespace Jellyfin.Plugin.Lastfm;
 
 /// <summary>
 /// The main plugin entry point for the Last.fm integration.
-/// Registers the plugin with Jellyfin's DI container and hooks into
-/// playback events for automatic scrobbling and now playing notifications.
+/// Implements IPluginServiceRegistrator for DI, IHasWebPages for config page,
+/// and IScheduledTask for background task integration.
 /// </summary>
-public class LastfmPluginEntry : IPluginServiceRegistrator, IHasWebPages
-{
-    /// <inheritdoc />
-    public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
-    {
-        serviceCollection.AddSingleton<LastfmPlugin>();
-    }
-
-    /// <inheritdoc />
-    public IEnumerable<PluginPageInfo> GetPages()
-    {
-        return new[]
-        {
-            new PluginPageInfo
-            {
-                Name = "Lastfm",
-                DisplayName = "Last.fm",
-                EmbeddedResourcePath = "Jellyfin.Plugin.Lastfm.Configuration.config.html",
-                EnableInMainMenu = true,
-                MenuSection = "plugins",
-                MenuIcon = "music_note"
-            }
-        };
-    }
-}
-
-/// <summary>
-/// The core Lastfm service that handles playback events.
-/// Implements IScheduledTask so Jellyfin recognizes it as a plugin task.
-/// </summary>
-public class LastfmPlugin : IScheduledTask
+public class LastfmPlugin : IPluginServiceRegistrator, IHasWebPages, IScheduledTask
 {
     private readonly ISessionManager _sessionManager;
     private readonly ILogger<LastfmPlugin> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
-    private PluginConfiguration _config;
-    private LastfmApiClient _apiClient;
+    private PluginConfiguration _config = null!;
+    private LastfmApiClient _apiClient = null!;
 
     private readonly Dictionary<string, PlaybackTracker> _activeTrackers = new();
     private readonly object _trackerLock = new();
@@ -90,6 +60,17 @@ public class LastfmPlugin : IScheduledTask
     }
 
     /// <summary>
+    /// Parameterless constructor required for IHasWebPages instantiation by Jellyfin.
+    /// </summary>
+    public LastfmPlugin()
+    {
+        _sessionManager = null!;
+        _logger = null!;
+        _httpClientFactory = null!;
+        _config = new PluginConfiguration();
+    }
+
+    /// <summary>
     /// Gets or sets the plugin configuration.
     /// </summary>
     public PluginConfiguration Config
@@ -98,7 +79,10 @@ public class LastfmPlugin : IScheduledTask
         set
         {
             _config = value;
-            _apiClient = new LastfmApiClient(_httpClientFactory, _config, _logger);
+            if (_httpClientFactory != null && _logger != null)
+            {
+                _apiClient = new LastfmApiClient(_httpClientFactory, _config, _logger);
+            }
         }
     }
 
@@ -106,6 +90,27 @@ public class LastfmPlugin : IScheduledTask
     /// Gets the Last.fm API client.
     /// </summary>
     public LastfmApiClient ApiClient => _apiClient;
+
+    /// <inheritdoc />
+    public IEnumerable<PluginPageInfo> GetPages()
+    {
+        return new[]
+        {
+            new PluginPageInfo
+            {
+                Name = "Lastfm",
+                DisplayName = "Last.fm",
+                EmbeddedResourcePath = typeof(LastfmPlugin).Namespace + ".Configuration.config.html",
+                EnableInMainMenu = false
+            }
+        };
+    }
+
+    /// <inheritdoc />
+    public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
+    {
+        serviceCollection.AddSingleton<LastfmPlugin>();
+    }
 
     private async void OnPlaybackStarted(object? sender, PlaybackProgressEventArgs e)
     {
