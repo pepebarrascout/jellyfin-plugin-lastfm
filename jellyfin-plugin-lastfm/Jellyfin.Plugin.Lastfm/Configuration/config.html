@@ -44,8 +44,6 @@
         .link { color: #5b9bd5; text-decoration: none; }
         .link:hover { text-decoration: underline; }
         .divider { border: none; border-top: 1px solid #333; margin: 16px 0; }
-        .field-row { display: flex; gap: 10px; }
-        .field-row .field { flex: 1; }
         .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; vertical-align: middle; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -134,8 +132,10 @@
     </div>
 
     <script>
-        // Jellyfin configuration API path - uses the assembly name
-        var CONFIG_URL = '/System/Configuration/Jellyfin.Plugin.Lastfm';
+        // Plugin GUID - must match the Id property in LastfmPlugin.cs
+        var PLUGIN_ID = 'f3c07757-5b42-442e-a37a-f49355b6a7c0';
+        // Jellyfin plugin configuration API
+        var CONFIG_URL = '/Plugins/' + PLUGIN_ID + '/Configuration';
         var config = {};
 
         async function loadConfig() {
@@ -200,6 +200,7 @@
             document.getElementById('authSection').style.display = 'block';
             document.getElementById('connectedInfo').style.display = 'none';
             document.getElementById('btnCompleteAuth').style.display = 'none';
+            document.getElementById('btnConnect').style.display = 'inline-block';
         }
 
         async function saveConfig() {
@@ -247,9 +248,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config)
                 });
-            } catch (e) {
-                // Continue even if save fails - user can save later
-            }
+            } catch (e) { /* Continue */ }
 
             // Open Last.fm authorization page
             var authUrl = 'https://www.last.fm/api/auth/?api_key=' + encodeURIComponent(apiKey);
@@ -271,7 +270,7 @@
 
             var btn = document.getElementById('btnCompleteAuth');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Authenticating...';
+            btn.innerHTML = '<span class="spinner"></span> Getting token...';
 
             try {
                 // Step 1: Get a request token from Last.fm
@@ -294,10 +293,8 @@
                 var authUrl = 'https://www.last.fm/api/auth/?api_key=' + encodeURIComponent(apiKey) + '&token=' + encodeURIComponent(token);
                 window.open(authUrl, '_blank');
 
-                showMessage('Authorization page opened with token. Click "Complete Authorization" again after approving access.', 'info');
+                showMessage('Authorization page opened with token. Click "I Already Approved" after granting access.', 'info');
 
-                // Step 3: The user needs to approve first, then we exchange the token for a session
-                // We'll store the token and attempt to get a session
                 btn.textContent = 'I Already Approved';
                 btn.disabled = false;
                 btn.onclick = function() { exchangeTokenForSession(token, apiKey, apiSecret); };
@@ -312,28 +309,28 @@
         async function exchangeTokenForSession(token, apiKey, apiSecret) {
             var btn = document.getElementById('btnCompleteAuth');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Getting session...';
+            btn.innerHTML = '<span class="spinner"></span> Authenticating...';
 
             try {
                 // Generate API signature for auth.getSession
-                var sigParams = {
-                    'api_key': apiKey,
-                    'method': 'auth.getSession',
-                    'token': token
-                };
+                var sigParams = [
+                    ['api_key', apiKey],
+                    ['method', 'auth.getSession'],
+                    ['token', token]
+                ];
 
                 // Sort alphabetically and concatenate
-                var sortedKeys = Object.keys(sigParams).sort();
+                sigParams.sort(function(a, b) { return a[0].localeCompare(b[0]); });
                 var sigBase = '';
-                for (var i = 0; i < sortedKeys.length; i++) {
-                    sigBase += sortedKeys[i] + sigParams[sortedKeys[i]];
+                for (var i = 0; i < sigParams.length; i++) {
+                    sigBase += sigParams[i][0] + sigParams[i][1];
                 }
                 sigBase += apiSecret;
 
                 // MD5 hash
-                var sig = await md5(sigBase);
+                var sig = md5(sigBase);
 
-                // Call auth.getSession via our plugin's API proxy or directly
+                // Call auth.getSession
                 var formData = new URLSearchParams();
                 formData.append('method', 'auth.getSession');
                 formData.append('api_key', apiKey);
@@ -353,18 +350,24 @@
                     config.SessionKey = data.session.key;
                     config.Username = data.session.name;
 
-                    await fetch(CONFIG_URL, {
+                    var saveResp = await fetch(CONFIG_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(config)
                     });
 
-                    showConnected(data.session.name);
-                    showMessage('Successfully connected to Last.fm as ' + data.session.name + '!', 'success');
+                    if (saveResp.ok) {
+                        showConnected(data.session.name);
+                        showMessage('Successfully connected to Last.fm as ' + data.session.name + '!', 'success');
+                    } else {
+                        showMessage('Connected but failed to save session. Try again.', 'error');
+                        btn.disabled = false;
+                        btn.textContent = 'Complete Authorization';
+                    }
                 } else {
-                    showMessage('Authentication failed: ' + (data.error + ' - ' + data.message || 'Unknown error'), 'error');
+                    var errMsg = (data.error ? data.error + ' - ' : '') + (data.message || 'Unknown error');
+                    showMessage('Authentication failed: ' + errMsg, 'error');
                     btn.disabled = false;
-                    btn.innerHTML = '<span class="spinner"></span> Getting session...';
                     btn.textContent = 'Complete Authorization';
                 }
             } catch (e) {
@@ -391,20 +394,8 @@
             }
         }
 
-        // Simple MD5 implementation for API signature generation
-        async function md5(string) {
-            var msgBuffer = new TextEncoder().encode(string);
-            var hashBuffer = await crypto.subtle.digest('MD5', msgBuffer);
-            if (!hashBuffer) {
-                // Fallback: MD5 might not be available in all browsers via crypto.subtle
-                // Use a simple implementation
-                return md5Fallback(string);
-            }
-            var hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
-        }
-
-        function md5Fallback(string) {
+        // MD5 implementation for API signature generation
+        function md5(string) {
             function safeAdd(x, y) { var lsw = (x & 0xffff) + (y & 0xffff); var msw = (x >> 16) + (y >> 16) + (lsw >> 16); return (msw << 16) | (lsw & 0xffff); }
             function bitRotateLeft(num, cnt) { return (num << cnt) | (num >>> (32 - cnt)); }
             function md5cmn(q, a, b, x, s, t) { return safeAdd(bitRotateLeft(safeAdd(safeAdd(a, q), safeAdd(x, t)), s), b); }
@@ -430,7 +421,7 @@
                     a = md5hh(a,b,c,d,x[i+5],4,-378558); d = md5hh(d,a,b,c,x[i+8],11,-2022574463); c = md5hh(c,d,a,b,x[i+11],16,1839030562); b = md5hh(b,c,d,a,x[i+14],23,-35309556);
                     a = md5hh(a,b,c,d,x[i+1],4,-1530992060); d = md5hh(d,a,b,c,x[i+4],11,1272893353); c = md5hh(c,d,a,b,x[i+7],16,-155497632); b = md5hh(b,c,d,a,x[i+10],23,-1094730640);
                     a = md5hh(a,b,c,d,x[i+13],4,681279174); d = md5hh(d,a,b,c,x[i],11,-358537222); c = md5hh(c,d,a,b,x[i+3],16,-722521979); b = md5hh(b,c,d,a,x[i+6],23,76029189);
-                    a = md5hh(a,b,c,d,x[i+9],4,-640364487); d = md5hh(d,a,b,c,x[i+12],11,-421815835); c = md5hh(c,d,a,b,x[i+15],16,530742520); b = md5hh(b,c,d,a,x[i+2],23,-995338651);
+                    a = md5hh(a,b,c,d,x[i+9],4,-640364487); d = md5hh(d,a,b,c,x[i+12],11,-421815835); c = md5hh(c,d,a,b,x[i+15],16,530742520); b = md5hh(b,c,d,a,x[i+2],23,-343485551);
                     a = md5ii(a,b,c,d,x[i],6,-198630844); d = md5ii(d,a,b,c,x[i+7],10,1126891415); c = md5ii(c,d,a,b,x[i+14],15,-1416354905); b = md5ii(b,c,d,a,x[i+5],21,-57434055);
                     a = md5ii(a,b,c,d,x[i+12],6,1700485571); d = md5ii(d,a,b,c,x[i+3],10,-1894986606); c = md5ii(c,d,a,b,x[i+10],15,-1051523); b = md5ii(b,c,d,a,x[i+1],21,-2054922799);
                     a = md5ii(a,b,c,d,x[i+8],6,1873313359); d = md5ii(d,a,b,c,x[i+15],10,-30611744); c = md5ii(c,d,a,b,x[i+6],15,-1560198380); b = md5ii(b,c,d,a,x[i+13],21,1309151649);
@@ -442,19 +433,16 @@
 
             function str2binl(str) {
                 var bin = [];
-                var mask = (1 << 8) - 1;
-                for (var i = 0; i < str.length * 8; i += 8) {
-                    bin[i >> 5] |= (str.charCodeAt(i / 8) & mask) << (i % 32);
-                }
+                for (var i = 0; i < str.length * 8; i += 8)
+                    bin[i >> 5] |= (str.charCodeAt(i / 8) & 0xff) << (i % 32);
                 return bin;
             }
 
             function binl2hex(binarray) {
                 var hexTab = '0123456789abcdef';
                 var str = '';
-                for (var i = 0; i < binarray.length * 4; i++) {
+                for (var i = 0; i < binarray.length * 4; i++)
                     str += hexTab.charAt((binarray[i >> 2] >> ((i % 4) * 8 + 4)) & 0xf) + hexTab.charAt((binarray[i >> 2] >> ((i % 4) * 8)) & 0xf);
-                }
                 return str;
             }
 
