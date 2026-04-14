@@ -50,14 +50,16 @@ public class LastfmPlugin : BasePlugin<PluginConfiguration>, IHasWebPages, IPlug
     /// button on the plugin card in the Jellyfin dashboard.
     /// </summary>
     /// <returns>The plugin pages.</returns>
+    /// <inheritdoc cref="IHasWebPages.GetPages" />
     public IEnumerable<PluginPageInfo> GetPages()
     {
         return new[]
         {
             new PluginPageInfo
             {
-                Name = "Lastfm",
-                EmbeddedResourcePath = GetType().Namespace + ".Configuration.config.html"
+                Name = Name,
+                EmbeddedResourcePath = GetType().Namespace + ".Configuration.config.html",
+                EnableInMainMenu = false
             }
         };
     }

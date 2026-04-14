@@ -10,10 +10,10 @@
     "versions": [
       {
         "version": "10.10.0.0",
-        "changelog": "- v10.10.0.0: Fix Settings button not appearing in dashboard\n- Plugin now extends BasePlugin for proper Jellyfin recognition\n- Added configuration page with Last.fm authentication flow\n- Separate scrobbler service for playback event handling\n- Updated to use /Plugins/{id}/Configuration API endpoint\n- Automatic scrobbling with configurable threshold (50% or 4 min)\n- Now playing notifications to Last.fm\n- Love/Ban/Unlove track support via API\n- Auto-love liked tracks option\n- Multi-session playback tracking\n- Configurable: scrobble %, min duration, album artist",
+        "changelog": "- v10.10.0.0: Initial release\n- Automatic scrobbling with configurable threshold (50% or 4 min)\n- Now playing notifications to Last.fm\n- Love/Ban/Unlove track support via API\n- Auto-love liked tracks option\n- Multi-session playback tracking\n- Configuration page with Last.fm authentication flow\n- Configurable: scrobble %, min duration, album artist",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/pepebarrascout/jellyfin-plugin-lastfm/releases/download/v10.10.0.0/jellyfin-plugin-lastfm_10.10.0.0.zip",
-        "checksum": "a7a345079c04633600e16b43e88fba07",
+        "checksum": "a951af32e371343cfebd71540198b2a6",
         "timestamp": "2026-04-14T22:00:00Z"
       }
     ]
