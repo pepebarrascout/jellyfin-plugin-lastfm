@@ -5,8 +5,8 @@
   "overview": "Integrates Jellyfin with Last.fm for automatic scrobbling, now playing notifications, and track management (love/ban).",
   "owner": "pepebarrascout",
   "category": "Music",
-  "version": "1.0.6.2",
-  "changelog": "- v1.0.6.2: Fix scrobble lost on track change in Feishin/Amafy",
+  "version": "1.0.7.0",
+  "changelog": "- v1.0.7.0: Fix future timestamps on seek, use tracker start time directly for stop scrobbles",
   "targetAbi": "10.11.0.0",
   "timestamp": "2026-04-15T14:00:00Z",
   "imagePath": "logo.png"

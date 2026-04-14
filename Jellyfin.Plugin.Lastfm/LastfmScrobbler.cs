@@ -221,8 +221,7 @@ public class LastfmScrobbler : IHostedService, IDisposable
                     var artist = GetArtistName(audio);
                     var album = audio.Album;
                     var title = audio.Name ?? string.Empty;
-                    // Use the tracker's recorded start time for an accurate timestamp
-                    var timestamp = tracker.StartTimeUnix + positionSeconds;
+                    var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
                     var response = await apiClient.ScrobbleAsync(artist, title, album, timestamp);
                     _logger.LogInformation("Last.fm scrobble sent: {Artist} - {Title} at {Timestamp} (response: {StatusCode})",
@@ -265,6 +264,7 @@ public class LastfmScrobbler : IHostedService, IDisposable
             }
 
             bool wasScrobbled;
+            long trackStartTimeUnix = 0;
 
             lock (_trackerLock)
             {
@@ -280,6 +280,7 @@ public class LastfmScrobbler : IHostedService, IDisposable
                 }
 
                 wasScrobbled = tracker.Scrobbled;
+                trackStartTimeUnix = tracker.StartTimeUnix;
                 _activeTrackers.Remove(key);
             }
 
@@ -315,7 +316,7 @@ public class LastfmScrobbler : IHostedService, IDisposable
                     var artist = GetArtistName(audio);
                     var album = audio.Album;
                     var title = audio.Name ?? string.Empty;
-                    var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - positionSeconds;
+                    var timestamp = trackStartTimeUnix;
 
                     var response = await apiClient.ScrobbleAsync(artist, title, album, timestamp);
                     _logger.LogInformation("Last.fm scrobble sent on stop: {Artist} - {Title} (response: {StatusCode})",
