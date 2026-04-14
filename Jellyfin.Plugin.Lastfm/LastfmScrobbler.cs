@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Lastfm.Api;
@@ -101,6 +102,14 @@ public class LastfmScrobbler : IHostedService, IDisposable
 
     private PluginConfiguration? Config => LastfmPlugin.Instance?.Configuration;
 
+    /// <summary>
+    /// Generates a unique tracker key combining device and item identifiers.
+    /// Using DeviceId + ItemId ensures each track has its own tracker entry,
+    /// preventing race conditions when events arrive out of order during track changes.
+    /// </summary>
+    private static string GetTrackerKey(string deviceId, Guid itemId)
+        => $"{deviceId}:{itemId:N}";
+
     private async void OnPlaybackStarted(object? sender, PlaybackProgressEventArgs e)
     {
         try
@@ -119,9 +128,21 @@ public class LastfmScrobbler : IHostedService, IDisposable
             }
 
             var tracker = new PlaybackTracker(audio, e.PlaybackPositionTicks ?? 0);
+            var key = GetTrackerKey(e.DeviceId, audio.Id);
+
             lock (_trackerLock)
             {
-                _activeTrackers[e.DeviceId] = tracker;
+                // Remove any old trackers for this device (from previous tracks)
+                var oldKeys = _activeTrackers.Keys
+                    .Where(k => k.StartsWith(e.DeviceId + ":", StringComparison.Ordinal))
+                    .ToList();
+
+                foreach (var oldKey in oldKeys)
+                {
+                    _activeTrackers.Remove(oldKey);
+                }
+
+                _activeTrackers[key] = tracker;
             }
 
             if (config.NowPlayingEnabled)
@@ -165,16 +186,18 @@ public class LastfmScrobbler : IHostedService, IDisposable
                 return;
             }
 
+            var key = GetTrackerKey(e.DeviceId, audio.Id);
             PlaybackTracker? tracker;
+
             lock (_trackerLock)
             {
-                if (!_activeTrackers.TryGetValue(e.DeviceId, out tracker))
+                if (!_activeTrackers.TryGetValue(key, out tracker))
                 {
                     return;
                 }
             }
 
-            if (tracker.Scrobbled || tracker.TrackId != audio.Id.ToString("N", CultureInfo.InvariantCulture))
+            if (tracker.Scrobbled)
             {
                 return;
             }
@@ -238,19 +261,7 @@ public class LastfmScrobbler : IHostedService, IDisposable
             var config = Config;
             bool wasScrobbled = false;
 
-            if (e.Item is Audio audio)
-            {
-                lock (_trackerLock)
-                {
-                    if (_activeTrackers.TryGetValue(e.DeviceId, out var tracker))
-                    {
-                        wasScrobbled = tracker.Scrobbled;
-                    }
-
-                    _activeTrackers.Remove(e.DeviceId);
-                }
-            }
-            else
+            if (e.Item is not Audio audio)
             {
                 return;
             }
@@ -258,6 +269,27 @@ public class LastfmScrobbler : IHostedService, IDisposable
             if (config == null || !config.ScrobblingEnabled || string.IsNullOrEmpty(config.SessionKey))
             {
                 return;
+            }
+
+            var key = GetTrackerKey(e.DeviceId, audio.Id);
+
+            lock (_trackerLock)
+            {
+                if (_activeTrackers.TryGetValue(key, out var tracker))
+                {
+                    wasScrobbled = tracker.Scrobbled;
+                    _activeTrackers.Remove(key);
+                }
+
+                // Clean up any remaining trackers for this device
+                var oldKeys = _activeTrackers.Keys
+                    .Where(k => k.StartsWith(e.DeviceId + ":", StringComparison.Ordinal))
+                    .ToList();
+
+                foreach (var oldKey in oldKeys)
+                {
+                    _activeTrackers.Remove(oldKey);
+                }
             }
 
             // Skip if already scrobbled during playback progress
