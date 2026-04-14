@@ -9,8 +9,16 @@
     "imageUrl": "https://raw.githubusercontent.com/pepebarrascout/jellyfin-plugin-lastfm/main/logo.png",
     "versions": [
       {
+        "version": "1.0.6.2",
+        "changelog": "- Fix: Scrobble replaced when changing tracks in Feishin/Amafy\n- PlaybackStopped no longer sends duplicate scrobble if tracker already handled\n- Consistent scrobble timestamps using recorded start time",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/pepebarrascout/jellyfin-plugin-lastfm/releases/download/v1.0.6.2/jellyfin-plugin-lastfm_1.0.6.2.zip",
+        "checksum": "8f326ac49b3ab65dd9e035b6c2e07d57",
+        "timestamp": "2026-04-15T14:00:00Z"
+      },
+      {
         "version": "1.0.6.1",
-        "changelog": "- Fix: Scrobble lost when changing tracks with Feishin (tracker key now uses DeviceId+ItemId)\n- Prevents race condition when playback events arrive out of order during track transitions",
+        "changelog": "- Fix: Scrobble lost on track change with Feishin",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/pepebarrascout/jellyfin-plugin-lastfm/releases/download/v1.0.6.1/jellyfin-plugin-lastfm_1.0.6.1.zip",
         "checksum": "6ed692040b7def07453da3c902aa2769",
@@ -18,7 +26,7 @@
       },
       {
         "version": "1.0.6.0",
-        "changelog": "- Fix: Scrobbling now works - LastfmScrobbler implements IHostedService for automatic startup\n- Fix: Removed incompatible Microsoft.Extensions.* v10.0 references\n- Fix: Plugin structure reorganized for clarity",
+        "changelog": "- Fix: Scrobbling now works - IHostedService for automatic startup",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/pepebarrascout/jellyfin-plugin-lastfm/releases/download/v1.0.6.0/jellyfin-plugin-lastfm_1.0.6.0.zip",
         "checksum": "ca635d364c6de0126efeba111d426dbf",

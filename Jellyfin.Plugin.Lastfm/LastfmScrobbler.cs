@@ -90,7 +90,6 @@ public class LastfmScrobbler : IHostedService, IDisposable
             }
             else
             {
-                // Always refresh credentials from config in case they changed after authentication
                 _apiClient.ApiKey = config.ApiKey;
                 _apiClient.ApiSecret = config.ApiSecret;
                 _apiClient.SessionKey = config.SessionKey;
@@ -104,8 +103,6 @@ public class LastfmScrobbler : IHostedService, IDisposable
 
     /// <summary>
     /// Generates a unique tracker key combining device and item identifiers.
-    /// Using DeviceId + ItemId ensures each track has its own tracker entry,
-    /// preventing race conditions when events arrive out of order during track changes.
     /// </summary>
     private static string GetTrackerKey(string deviceId, Guid itemId)
         => $"{deviceId}:{itemId:N}";
@@ -132,18 +129,11 @@ public class LastfmScrobbler : IHostedService, IDisposable
 
             lock (_trackerLock)
             {
-                // Remove any old trackers for this device (from previous tracks)
-                var oldKeys = _activeTrackers.Keys
-                    .Where(k => k.StartsWith(e.DeviceId + ":", StringComparison.Ordinal))
-                    .ToList();
-
-                foreach (var oldKey in oldKeys)
-                {
-                    _activeTrackers.Remove(oldKey);
-                }
-
                 _activeTrackers[key] = tracker;
             }
+
+            _logger.LogDebug("Last.fm: Playback started - {Artist} - {Title} (key: {Key})",
+                audio.Artists?.FirstOrDefault() ?? "Unknown", audio.Name, key);
 
             if (config.NowPlayingEnabled)
             {
@@ -213,8 +203,6 @@ public class LastfmScrobbler : IHostedService, IDisposable
             var durationSeconds = durationTicks / 10_000_000;
             if (durationSeconds < config.MinDurationSeconds)
             {
-                _logger.LogDebug("Last.fm: Track too short ({Duration}s < {MinDuration}s): {Title}",
-                    durationSeconds, config.MinDurationSeconds, audio.Name);
                 return;
             }
 
@@ -222,9 +210,6 @@ public class LastfmScrobbler : IHostedService, IDisposable
 
             // Last.fm scrobble rules: configured percent OR 4 minutes, whichever comes first
             var minScrobbleSeconds = Math.Min((int)(durationSeconds * config.ScrobblePercent / 100.0), 240);
-
-            _logger.LogDebug("Last.fm: Progress {Position}s / {Duration}s (threshold: {Threshold}s): {Title}",
-                positionSeconds, durationSeconds, minScrobbleSeconds, audio.Name);
 
             if (positionSeconds >= minScrobbleSeconds)
             {
@@ -236,11 +221,12 @@ public class LastfmScrobbler : IHostedService, IDisposable
                     var artist = GetArtistName(audio);
                     var album = audio.Album;
                     var title = audio.Name ?? string.Empty;
-                    var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - positionSeconds;
+                    // Use the tracker's recorded start time for an accurate timestamp
+                    var timestamp = tracker.StartTimeUnix + positionSeconds;
 
                     var response = await apiClient.ScrobbleAsync(artist, title, album, timestamp);
-                    _logger.LogInformation("Last.fm scrobble sent: {Artist} - {Title} (response: {StatusCode})",
-                        artist, title, response.StatusCode);
+                    _logger.LogInformation("Last.fm scrobble sent: {Artist} - {Title} at {Timestamp} (response: {StatusCode})",
+                        artist, title, timestamp, response.StatusCode);
                 }
                 else
                 {
@@ -259,37 +245,42 @@ public class LastfmScrobbler : IHostedService, IDisposable
         try
         {
             var config = Config;
-            bool wasScrobbled = false;
 
-            if (e.Item is not Audio audio)
-            {
-                return;
-            }
-
-            if (config == null || !config.ScrobblingEnabled || string.IsNullOrEmpty(config.SessionKey))
+            if (e.Item is not Audio audio || config == null)
             {
                 return;
             }
 
             var key = GetTrackerKey(e.DeviceId, audio.Id);
 
-            lock (_trackerLock)
+            if (!config.ScrobblingEnabled || string.IsNullOrEmpty(config.SessionKey))
             {
-                if (_activeTrackers.TryGetValue(key, out var tracker))
+                // Still clean up the tracker even if scrobbling is disabled
+                lock (_trackerLock)
                 {
-                    wasScrobbled = tracker.Scrobbled;
                     _activeTrackers.Remove(key);
                 }
 
-                // Clean up any remaining trackers for this device
-                var oldKeys = _activeTrackers.Keys
-                    .Where(k => k.StartsWith(e.DeviceId + ":", StringComparison.Ordinal))
-                    .ToList();
+                return;
+            }
 
-                foreach (var oldKey in oldKeys)
+            bool wasScrobbled;
+
+            lock (_trackerLock)
+            {
+                if (!_activeTrackers.TryGetValue(key, out var tracker))
                 {
-                    _activeTrackers.Remove(oldKey);
+                    // Tracker was already removed or never existed.
+                    // This can happen if OnPlaybackStarted for the NEXT track
+                    // already cleaned it up, or if we already handled this stop.
+                    // Either way, do NOT send a scrobble to avoid duplicates.
+                    _logger.LogDebug("Last.fm: Playback stopped for {Title} but no tracker found - skipping",
+                        audio.Name);
+                    return;
                 }
+
+                wasScrobbled = tracker.Scrobbled;
+                _activeTrackers.Remove(key);
             }
 
             // Skip if already scrobbled during playback progress
@@ -298,6 +289,7 @@ public class LastfmScrobbler : IHostedService, IDisposable
                 return;
             }
 
+            // Track reached threshold only at stop (no progress event triggered it)
             var positionTicks = e.PlaybackPositionTicks ?? 0;
             var durationTicks = audio.RunTimeTicks ?? 0;
 
@@ -389,6 +381,7 @@ internal class PlaybackTracker
         TrackId = audio.Id.ToString("N", CultureInfo.InvariantCulture);
         DurationTicks = audio.RunTimeTicks ?? 0;
         StartPositionTicks = positionTicks;
+        StartTimeUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (positionTicks / 10_000_000);
         Scrobbled = false;
     }
 
@@ -406,6 +399,12 @@ internal class PlaybackTracker
     /// Gets or sets the starting position in ticks.
     /// </summary>
     public long StartPositionTicks { get; set; }
+
+    /// <summary>
+    /// Gets the approximate Unix timestamp when playback started.
+    /// Used to calculate accurate scrobble timestamps.
+    /// </summary>
+    public long StartTimeUnix { get; }
 
     /// <summary>
     /// Gets or sets a value indicating whether this track has already been scrobbled.
