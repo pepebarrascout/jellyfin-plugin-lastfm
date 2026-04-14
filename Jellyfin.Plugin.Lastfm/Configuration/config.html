@@ -1,0 +1,364 @@
+<div id="lastfmConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
+    <div data-role="content">
+        <form id="lastfmConfigForm">
+            <div class="content-primary">
+                <div class="sectionTitleContainer flex align-items-center">
+                    <h2 class="sectionTitle">Last.fm Scrobbler</h2>
+                </div>
+
+                <div id="lastfmStatus" class="lastfmStatus" style="padding:12px 16px;border-radius:8px;margin-bottom:20px;font-size:0.9rem;background:#3a1a1a;border:1px solid #5a2d2d;color:#e66e6e;">
+                    Not connected to Last.fm
+                </div>
+
+                <div class="inputContainer" style="margin-bottom:20px;">
+                    <h3 style="margin-bottom:12px;">API Credentials</h3>
+                    <p style="color:#888;font-size:0.85rem;margin-bottom:14px;">
+                        Get your API key at <a href="https://www.last.fm/api/account/create" target="_blank" style="color:#5b9bd5;">last.fm/api/account/create</a>
+                    </p>
+                    <div class="inputContainer">
+                        <label for="lastfmApiKey">API Key</label>
+                        <input type="text" id="lastfmApiKey" is="emby-input" />
+                    </div>
+                    <div class="inputContainer">
+                        <label for="lastfmApiSecret">Shared Secret</label>
+                        <input type="password" id="lastfmApiSecret" is="emby-input" />
+                    </div>
+                </div>
+
+                <div id="lastfmAuthSection" class="inputContainer" style="margin-bottom:20px;">
+                    <h3 style="margin-bottom:12px;">Authentication</h3>
+                    <p style="color:#888;font-size:0.85rem;margin-bottom:14px;">
+                        1. Enter your API credentials above and click <strong>Save</strong>.<br>
+                        2. Click <strong>Connect to Last.fm</strong> to authorize.<br>
+                        3. After authorizing, click <strong>I Already Approved</strong>.
+                    </p>
+                    <div style="display:flex;gap:10px;">
+                        <button id="lastfmBtnConnect" type="button" is="emby-button" class="raised">
+                            <span>Connect to Last.fm</span>
+                        </button>
+                        <button id="lastfmBtnCompleteAuth" type="button" is="emby-button" class="raised button-submit" style="display:none;">
+                            <span>I Already Approved</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="lastfmConnectedInfo" style="display:none;margin-bottom:20px;">
+                    <h3 style="margin-bottom:12px;">Connected</h3>
+                    <p style="color:#6ee66e;font-size:0.9rem;">
+                        Connected as <strong id="lastfmUsername"></strong>
+                    </p>
+                    <br>
+                    <button id="lastfmBtnDisconnect" type="button" is="emby-button" class="raised" style="background:#c44;color:#fff;">
+                        <span>Disconnect</span>
+                    </button>
+                </div>
+
+                <div class="inputContainer">
+                    <h3 style="margin-bottom:12px;">Settings</h3>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input type="checkbox" id="lastfmScrobblingEnabled" is="emby-checkbox" checked />
+                            <span>Enable Scrobbling</span>
+                        </label>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input type="checkbox" id="lastfmNowPlayingEnabled" is="emby-checkbox" checked />
+                            <span>Enable Now Playing Notifications</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label for="lastfmScrobblePercent">Scrobble after: <span id="lastfmScrobbleValue">25%</span></label>
+                        <input type="range" id="lastfmScrobblePercent" min="25" max="95" value="25" style="width:100%;" />
+                        <div class="fieldDescription">Percentage of track playback before scrobbling (Last.fm maximum: 4 minutes)</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label for="lastfmMinDuration">Minimum track duration (seconds)</label>
+                        <input type="number" id="lastfmMinDuration" is="emby-input" value="25" min="0" max="600" />
+                        <div class="fieldDescription">Tracks shorter than this will not be scrobbled</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input type="checkbox" id="lastfmAutoLoveLikedTracks" is="emby-checkbox" checked />
+                            <span>Auto-love liked tracks</span>
+                        </label>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input type="checkbox" id="lastfmUseAlbumArtist" is="emby-checkbox" />
+                            <span>Use Album Artist for scrobbling</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" is="emby-button" class="raised button-submit block">
+                    <span>Save</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script type="text/javascript">
+        var LastfmPluginId = 'f3c07757-5b42-442e-a37a-f49355b6a7c0';
+        var lastfmConfig = {};
+
+        // Normalize config from server response (handles both camelCase and PascalCase)
+        function lastfmNormalizeConfig(raw) {
+            return {
+                apiKey: raw.apiKey || raw.ApiKey || '',
+                apiSecret: raw.apiSecret || raw.ApiSecret || '',
+                sessionKey: raw.sessionKey || raw.SessionKey || '',
+                username: raw.username || raw.Username || '',
+                scrobblingEnabled: raw.scrobblingEnabled !== undefined ? raw.scrobblingEnabled : (raw.ScrobblingEnabled !== undefined ? raw.ScrobblingEnabled : true),
+                nowPlayingEnabled: raw.nowPlayingEnabled !== undefined ? raw.nowPlayingEnabled : (raw.NowPlayingEnabled !== undefined ? raw.NowPlayingEnabled : true),
+                scrobblePercent: raw.scrobblePercent || raw.ScrobblePercent || 25,
+                minDurationSeconds: raw.minDurationSeconds || raw.MinDurationSeconds || 25,
+                autoLoveLikedTracks: raw.autoLoveLikedTracks !== undefined ? raw.autoLoveLikedTracks : (raw.AutoLoveLikedTracks !== undefined ? raw.AutoLoveLikedTracks : true),
+                useAlbumArtist: raw.useAlbumArtist !== undefined ? raw.useAlbumArtist : (raw.UseAlbumArtist !== undefined ? raw.UseAlbumArtist : false),
+                checkAlbumArtist: raw.checkAlbumArtist !== undefined ? raw.checkAlbumArtist : (raw.CheckAlbumArtist !== undefined ? raw.CheckAlbumArtist : true)
+            };
+        }
+
+        // Send config with BOTH camelCase and PascalCase keys for maximum compatibility.
+        // Jellyfin 10.11 may expect camelCase; older versions use PascalCase.
+        // Sending both ensures the config is saved regardless of server behavior.
+        function lastfmToServerConfig(cfg) {
+            return {
+                apiKey: cfg.apiKey,
+                ApiKey: cfg.apiKey,
+                apiSecret: cfg.apiSecret,
+                ApiSecret: cfg.apiSecret,
+                sessionKey: cfg.sessionKey,
+                SessionKey: cfg.sessionKey,
+                username: cfg.username,
+                Username: cfg.username,
+                scrobblingEnabled: cfg.scrobblingEnabled,
+                ScrobblingEnabled: cfg.scrobblingEnabled,
+                nowPlayingEnabled: cfg.nowPlayingEnabled,
+                NowPlayingEnabled: cfg.nowPlayingEnabled,
+                scrobblePercent: cfg.scrobblePercent,
+                ScrobblePercent: cfg.scrobblePercent,
+                minDurationSeconds: cfg.minDurationSeconds,
+                MinDurationSeconds: cfg.minDurationSeconds,
+                autoLoveLikedTracks: cfg.autoLoveLikedTracks,
+                AutoLoveLikedTracks: cfg.autoLoveLikedTracks,
+                useAlbumArtist: cfg.useAlbumArtist,
+                UseAlbumArtist: cfg.useAlbumArtist,
+                checkAlbumArtist: cfg.checkAlbumArtist,
+                CheckAlbumArtist: cfg.checkAlbumArtist
+            };
+        }
+
+        function lastfmLoadConfig() {
+            ApiClient.getPluginConfiguration(LastfmPluginId).then(function (cfg) {
+                lastfmConfig = lastfmNormalizeConfig(cfg || {});
+                lastfmApplyToUI(lastfmConfig);
+                console.log('Last.fm config loaded:', lastfmConfig);
+            }).catch(function (err) {
+                console.error('Last.fm: Failed to load config:', err);
+            });
+        }
+
+        function lastfmApplyToUI(cfg) {
+            if (cfg.apiKey) document.getElementById('lastfmApiKey').value = cfg.apiKey;
+            if (cfg.apiSecret) document.getElementById('lastfmApiSecret').value = cfg.apiSecret;
+            document.getElementById('lastfmScrobblingEnabled').checked = cfg.scrobblingEnabled !== false;
+            document.getElementById('lastfmNowPlayingEnabled').checked = cfg.nowPlayingEnabled !== false;
+            var pct = cfg.scrobblePercent || 25;
+            document.getElementById('lastfmScrobblePercent').value = pct;
+            document.getElementById('lastfmScrobbleValue').textContent = pct + '%';
+            document.getElementById('lastfmMinDuration').value = cfg.minDurationSeconds || 25;
+            document.getElementById('lastfmAutoLoveLikedTracks').checked = cfg.autoLoveLikedTracks !== false;
+            document.getElementById('lastfmUseAlbumArtist').checked = cfg.useAlbumArtist === true;
+            if (cfg.sessionKey && cfg.username) {
+                lastfmShowConnected(cfg.username);
+            } else {
+                lastfmShowDisconnected();
+            }
+        }
+
+        function lastfmCollectFromUI() {
+            return {
+                apiKey: (document.getElementById('lastfmApiKey').value || '').trim(),
+                apiSecret: (document.getElementById('lastfmApiSecret').value || '').trim(),
+                sessionKey: lastfmConfig.sessionKey || '',
+                username: lastfmConfig.username || '',
+                scrobblingEnabled: document.getElementById('lastfmScrobblingEnabled').checked,
+                nowPlayingEnabled: document.getElementById('lastfmNowPlayingEnabled').checked,
+                scrobblePercent: parseInt(document.getElementById('lastfmScrobblePercent').value) || 25,
+                minDurationSeconds: parseInt(document.getElementById('lastfmMinDuration').value) || 25,
+                autoLoveLikedTracks: document.getElementById('lastfmAutoLoveLikedTracks').checked,
+                useAlbumArtist: document.getElementById('lastfmUseAlbumArtist').checked,
+                checkAlbumArtist: lastfmConfig.checkAlbumArtist !== false
+            };
+        }
+
+        function lastfmSaveConfig() {
+            lastfmConfig = lastfmCollectFromUI();
+            ApiClient.updatePluginConfiguration(LastfmPluginId, lastfmToServerConfig(lastfmConfig)).then(function (result) {
+                Dashboard.processPluginConfigurationUpdateResult(result);
+            }).catch(function (err) {
+                Dashboard.alert({ title: 'Error', message: 'Failed to save: ' + (err.message || err) });
+            });
+        }
+
+        function lastfmShowConnected(username) {
+            document.getElementById('lastfmStatus').innerHTML = 'Connected as <strong>' + username + '</strong>';
+            document.getElementById('lastfmStatus').style.cssText = 'padding:12px 16px;border-radius:8px;margin-bottom:20px;font-size:0.9rem;background:#1a3a1a;border:1px solid #2d5a2d;color:#6ee66e;';
+            document.getElementById('lastfmAuthSection').style.display = 'none';
+            document.getElementById('lastfmConnectedInfo').style.display = 'block';
+            document.getElementById('lastfmUsername').textContent = username;
+        }
+
+        function lastfmShowDisconnected() {
+            document.getElementById('lastfmStatus').innerHTML = 'Not connected to Last.fm';
+            document.getElementById('lastfmStatus').style.cssText = 'padding:12px 16px;border-radius:8px;margin-bottom:20px;font-size:0.9rem;background:#3a1a1a;border:1px solid #5a2d2d;color:#e66e6e;';
+            document.getElementById('lastfmAuthSection').style.display = 'block';
+            document.getElementById('lastfmConnectedInfo').style.display = 'none';
+            document.getElementById('lastfmBtnCompleteAuth').style.display = 'none';
+            document.getElementById('lastfmBtnConnect').style.display = 'inline-block';
+        }
+
+        // Slider live update
+        document.getElementById('lastfmScrobblePercent').addEventListener('input', function () {
+            document.getElementById('lastfmScrobbleValue').textContent = this.value + '%';
+        });
+
+        // Save form submit
+        document.getElementById('lastfmConfigForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            lastfmSaveConfig();
+        });
+
+        // Connect button
+        document.getElementById('lastfmBtnConnect').addEventListener('click', function () {
+            var apiKey = document.getElementById('lastfmApiKey').value.trim();
+            var apiSecret = document.getElementById('lastfmApiSecret').value.trim();
+            if (!apiKey || !apiSecret) {
+                Dashboard.alert({ title: 'Error', message: 'Enter your API Key and Shared Secret first, then click Save.' });
+                return;
+            }
+            lastfmSaveConfig();
+
+            fetch('https://ws.audioscrobbler.com/2.0/?method=auth.gettoken&api_key=' + encodeURIComponent(apiKey) + '&format=json')
+                .then(function (r) { return r.json(); })
+                .then(function (tokenData) {
+                    if (!tokenData.token) {
+                        Dashboard.alert({ title: 'Error', message: 'Failed to get auth token: ' + (tokenData.message || 'Unknown') });
+                        return;
+                    }
+                    var token = tokenData.token;
+                    window.open('https://www.last.fm/api/auth/?api_key=' + encodeURIComponent(apiKey) + '&token=' + encodeURIComponent(token), '_blank');
+                    document.getElementById('lastfmBtnConnect').style.display = 'none';
+                    var btnComplete = document.getElementById('lastfmBtnCompleteAuth');
+                    btnComplete.style.display = 'inline-block';
+                    btnComplete.disabled = false;
+                    btnComplete.querySelector('span').textContent = 'I Already Approved';
+                    btnComplete.onclick = function () { lastfmExchangeToken(token, apiKey, apiSecret); };
+                    Dashboard.alert({ title: 'Authorization', message: 'Authorization page opened. After approving, click "I Already Approved".' });
+                })
+                .catch(function (e) {
+                    Dashboard.alert({ title: 'Error', message: 'Auth error: ' + e.message });
+                });
+        });
+
+        function lastfmExchangeToken(token, apiKey, apiSecret) {
+            var btn = document.getElementById('lastfmBtnCompleteAuth');
+            btn.disabled = true;
+            btn.querySelector('span').textContent = 'Getting session...';
+
+            var sig = lastfmMd5('api_key' + apiKey + 'methodauth.getSession' + 'token' + token + apiSecret);
+            var formData = new URLSearchParams();
+            formData.append('method', 'auth.getSession');
+            formData.append('api_key', apiKey);
+            formData.append('token', token);
+            formData.append('api_sig', sig);
+            formData.append('format', 'json');
+
+            fetch('https://ws.audioscrobbler.com/2.0/', { method: 'POST', body: formData })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.session && data.session.key && data.session.name) {
+                        lastfmConfig.sessionKey = data.session.key;
+                        lastfmConfig.username = data.session.name;
+                        ApiClient.updatePluginConfiguration(LastfmPluginId, lastfmToServerConfig(lastfmConfig)).then(function () {
+                            lastfmShowConnected(data.session.name);
+                            Dashboard.alert({ title: 'Success', message: 'Connected as ' + data.session.name + '!' });
+                        }).catch(function (err) {
+                            Dashboard.alert({ title: 'Error', message: 'Session OK but save failed: ' + (err.message || err) });
+                        });
+                    } else {
+                        Dashboard.alert({ title: 'Auth Failed', message: (data.error || '') + ' - ' + (data.message || 'Unknown') });
+                        btn.disabled = false;
+                        btn.querySelector('span').textContent = 'I Already Approved';
+                    }
+                })
+                .catch(function (e) {
+                    Dashboard.alert({ title: 'Error', message: 'Token exchange error: ' + e.message });
+                    btn.disabled = false;
+                    btn.querySelector('span').textContent = 'I Already Approved';
+                });
+        }
+
+        // Disconnect
+        document.getElementById('lastfmBtnDisconnect').addEventListener('click', function () {
+            lastfmConfig.sessionKey = '';
+            lastfmConfig.username = '';
+            ApiClient.updatePluginConfiguration(LastfmPluginId, lastfmToServerConfig(lastfmConfig)).then(function () {
+                lastfmShowDisconnected();
+                Dashboard.alert({ title: 'Disconnected', message: 'Disconnected from Last.fm.' });
+            });
+        });
+
+        // MD5
+        function lastfmMd5(string) {
+            function safeAdd(x, y) { var lsw = (x & 0xffff) + (y & 0xffff); var msw = (x >> 16) + (y >> 16) + (lsw >> 16); return (msw << 16) | (lsw & 0xffff); }
+            function bitRotateLeft(num, cnt) { return (num << cnt) | (num >>> (32 - cnt)); }
+            function md5cmn(q, a, b, x, s, t) { return safeAdd(bitRotateLeft(safeAdd(safeAdd(a, q), safeAdd(x, t)), s), b); }
+            function md5ff(a, b, c, d, x, s, t) { return md5cmn((b & c) | ((~b) & d), a, b, x, s, t); }
+            function md5gg(a, b, c, d, x, s, t) { return md5cmn((b & d) | (c & (~d)), a, b, x, s, t); }
+            function md5hh(a, b, c, d, x, s, t) { return md5cmn(b ^ c ^ d, a, b, x, s, t); }
+            function md5ii(a, b, c, d, x, s, t) { return md5cmn(c ^ (b | (~d)), a, b, x, s, t); }
+            function binlMD5(x, len) {
+                x[len >> 5] |= 0x80 << (len % 32);
+                x[((len + 64) >>> 9 << 4) + 14] = len;
+                var a = 1732584193, b = -271733879, c = -1732584194, d = 271733878;
+                for (var i = 0; i < x.length; i += 16) {
+                    var oa = a, ob = b, oc = c, od = d;
+                    a = md5ff(a,b,c,d,x[i],7,-680876936); d = md5ff(d,a,b,c,x[i+1],12,-389564586); c = md5ff(c,d,a,b,x[i+2],17,606105819); b = md5ff(b,c,d,a,x[i+3],22,-1044525330);
+                    a = md5ff(a,b,c,d,x[i+4],7,-176418897); d = md5ff(d,a,b,c,x[i+5],12,1200080426); c = md5ff(c,d,a,b,x[i+6],17,-1473231341); b = md5ff(b,c,d,a,x[i+7],22,-45705983);
+                    a = md5ff(a,b,c,d,x[i+8],7,1770035416); d = md5ff(d,a,b,c,x[i+9],12,-1958414417); c = md5ff(c,d,a,b,x[i+10],17,-42063); b = md5ff(b,c,d,a,x[i+11],22,-1990404162);
+                    a = md5ff(a,b,c,d,x[i+12],7,1804603682); d = md5ff(d,a,b,c,x[i+13],12,-40341101); c = md5ff(c,d,a,b,x[i+14],17,-1502002290); b = md5ff(b,c,d,a,x[i+15],22,1236535329);
+                    a = md5gg(a,b,c,d,x[i+1],5,-165796510); d = md5gg(d,a,b,c,x[i+6],9,-1069501632); c = md5gg(c,d,a,b,x[i+11],14,643717713); b = md5gg(b,c,d,a,x[i],20,-373897302);
+                    a = md5gg(a,b,c,d,x[i+5],5,-701558691); d = md5gg(d,a,b,c,x[i+10],9,38016083); c = md5gg(c,d,a,b,x[i+15],14,-660478335); b = md5gg(b,c,d,a,x[i+4],20,-405537848);
+                    a = md5gg(a,b,c,d,x[i+9],5,568446438); d = md5gg(d,a,b,c,x[i+14],9,-1019803690); c = md5gg(c,d,a,b,x[i+3],14,-187363961); b = md5gg(b,c,d,a,x[i+8],20,1163531501);
+                    a = md5gg(a,b,c,d,x[i+13],5,-1444681467); d = md5gg(d,a,b,c,x[i+2],9,-51403784); c = md5gg(c,d,a,b,x[i+7],14,1735328473); b = md5gg(b,c,d,a,x[i+12],20,-1926607734);
+                    a = md5hh(a,b,c,d,x[i+5],4,-378558); d = md5hh(d,a,b,c,x[i+8],11,-2022574463); c = md5hh(c,d,a,b,x[i+11],16,1839030562); b = md5hh(b,c,d,a,x[i+14],23,-35309556);
+                    a = md5hh(a,b,c,d,x[i+1],4,-1530992060); d = md5hh(d,a,b,c,x[i+4],11,1272893353); c = md5hh(c,d,a,b,x[i+7],16,-155497632); b = md5hh(b,c,d,a,x[i+10],23,-1094730640);
+                    a = md5hh(a,b,c,d,x[i+13],4,681279174); d = md5hh(d,a,b,c,x[i],11,-358537222); c = md5hh(c,d,a,b,x[i+3],16,-722521979); b = md5hh(b,c,d,a,x[i+6],23,76029189);
+                    a = md5hh(a,b,c,d,x[i+9],4,-640364487); d = md5hh(d,a,b,c,x[i+12],11,-421815835); c = md5hh(c,d,a,b,x[i+15],16,530742520); b = md5hh(b,c,d,a,x[i+2],23,-995338651);
+                    a = md5ii(a,b,c,d,x[i],6,-198630844); d = md5ii(d,a,b,c,x[i+7],10,1126891415); c = md5ii(c,d,a,b,x[i+14],15,-1416354905); b = md5ii(b,c,d,a,x[i+5],21,-57434055);
+                    a = md5ii(a,b,c,d,x[i+12],6,1700485571); d = md5ii(d,a,b,c,x[i+3],10,-1894986606); c = md5ii(c,d,a,b,x[i+10],15,-1051523); b = md5ii(b,c,d,a,x[i+1],21,-2054922799);
+                    a = md5ii(a,b,c,d,x[i+8],6,1873313359); d = md5ii(d,a,b,c,x[i+15],10,-30611744); c = md5ii(c,d,a,b,x[i+6],15,-1560198380); b = md5ii(b,c,d,a,x[i+13],21,1309151649);
+                    a = md5ii(a,b,c,d,x[i+4],6,-145523070); d = md5ii(d,a,b,c,x[i+11],10,-1120210379); c = md5ii(c,d,a,b,x[i+2],15,718787259); b = md5ii(b,c,d,a,x[i+9],21,-343485551);
+                    a = safeAdd(a, oa); b = safeAdd(b, ob); c = safeAdd(c, oc); d = safeAdd(d, od);
+                }
+                return [a, b, c, d];
+            }
+            function str2binl(str) { var bin = [], mask = (1 << 8) - 1; for (var i = 0; i < str.length * 8; i += 8) { bin[i >> 5] |= (str.charCodeAt(i / 8) & mask) << (i % 32); } return bin; }
+            function binl2hex(ba) { var h = '0123456789abcdef', s = ''; for (var i = 0; i < ba.length * 4; i++) { s += h.charAt((ba[i >> 2] >> ((i % 4) * 8 + 4)) & 0xf) + h.charAt((ba[i >> 2] >> ((i % 4) * 8)) & 0xf); } return s; }
+            return binl2hex(binlMD5(str2binl(string), string.length * 8));
+        }
+
+        // Load config when page shown
+        document.querySelector('#lastfmConfigPage').addEventListener('pageshow', function () {
+            lastfmLoadConfig();
+        });
+    </script>
+</div>
