@@ -53,7 +53,8 @@ Esta es la forma más sencilla de instalar el plugin. Solo necesitas agregar el 
 2. Haz clic en el botón **+** (agregar repositorio)
 3. Ingresa los siguientes datos:
    - **Nombre**: `Last.fm Plugin`
-   - **URL del Manifest**: `https://raw.githubusercontent.com/pepebarrascout/jellyfin-plugin-lastfm/main/manifest.json`
+   - **URL del Manifest**:
+   - ```https://raw.githubusercontent.com/pepebarrascout/jellyfin-plugin-lastfm/main/manifest.json```
 4. Haz clic en **Guardar**
 5. Navega a la pestaña **Catálogo**
 6. Busca **Last.fm** en la lista de plugins disponibles
